@@ -132,6 +132,13 @@ def get_config(module):
 
     return json.loads(content)
 
+# Get the folder configuration from the global configuration, if it exists
+def get_folder_config(folder_id, config):
+    for folder in config['folders']:
+        if folder['id'] == folder_id:
+            return folder
+    return None
+
 # Post the new configuration to Syncthing API
 def post_config(module, config, result):
     url, headers = make_headers(module.params['host'], module.params['api_key'])
@@ -239,39 +246,16 @@ def run_module():
                 result['changed'] = True
                 break
     else:
-        # Bail-out if folder is already added
-        for folder in config['folders']:
-            if folder['id'] == module.params['id']:
-                want_pause = module.params['state'] == 'pause'
-                already_configured = (
-                    (want_pause and folder['paused'])
-                    or
-                    (not want_pause and not folder['paused'])
-                )
+        folder_config = get_folder_config(module.params['id'], config)
+        folder_config_wanted = create_folder(module.params)
 
-                want_devices = sorted([
-                    {
-                        'deviceID': device_id,
-                        'introducedBy': '',
-                    } for device_id in module.params['devices']
-                ], key=lambda d: d['deviceID'])
-                already_configured = (
-                    already_configured
-                    and
-                    want_devices == sorted(folder['devices'], key=lambda d: d['deviceID'])
-                )
-
-                if already_configured:
-                    module.exit_json(**result)
-                else:
-                    folder['paused'] = want_pause
-                    result['changed'] = True
-                    break
-
-        # Append the new folder into configuration
-        if not result['changed']:
-            folder = create_folder(module.params)
-            config['folders'].append(folder)
+        if folder_config is None:
+            config['folders'].append(folder_config_wanted)
+            result['changed'] = True
+        elif folder_config != folder_config_wanted:
+            # Update the folder configuration in-place
+            folder_config.clear()
+            folder_config.update(folder_config_wanted)
             result['changed'] = True
 
     if result['changed']:
