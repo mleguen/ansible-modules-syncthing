@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright: (c) 2018, Rafael Bodill <justrafi at google mail>
+# Copyright: (c) 2020, Borjan Tchakaloff <first name at last name dot fr>
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 ANSIBLE_METADATA = {
@@ -38,6 +39,12 @@ options:
         description:
             - API key to use for authentication with host.
               If not provided, will try to auto-configure from filesystem.
+        required: false
+    config_file:
+        description:
+            - Path to the Syncthing configuration file for automatic
+              discovery (`api_key`). Note that the running user needs read
+              access to the file.
         required: false
     timeout:
         description:
@@ -91,7 +98,10 @@ def make_headers(host, api_key):
 
 def get_key_from_filesystem(module):
     try:
-        stconfigfile = os.path.expandvars(DEFAULT_ST_CONFIG_LOCATION)
+        if module.params['config_file']:
+            stconfigfile = module.params['config_file']
+        else:
+            stconfigfile = os.path.expandvars(DEFAULT_ST_CONFIG_LOCATION)
         stconfig = parse(stconfigfile)
         root = stconfig.getroot()
         gui = root.find('gui')
@@ -166,6 +176,7 @@ def run_module():
         name=dict(type='str', required=False),
         host=dict(type='str', default='http://127.0.0.1:8384'),
         api_key=dict(type='str', required=False, no_log=True),
+        config_file=dict(type='str', required=False),
         timeout=dict(type='int', default=30),
         state=dict(type='str', default='present',
                    choices=['absent', 'present', 'pause']),
