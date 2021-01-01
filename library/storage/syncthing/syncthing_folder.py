@@ -43,6 +43,12 @@ options:
         description:
             - Whether to ignore permissions when looking for changes.
         default: false
+    type:
+        description:
+            - The folder type: sending local chances, and/or receiving
+              remote changes.
+        default: sendreceive
+        choices: ['sendreceive', 'sendonly', 'receiveonly']
     host:
         description:
             - Host to connect to, including port
@@ -186,7 +192,7 @@ def create_folder(params):
         'pullerPauseS': 0,
         'rescanIntervalS': 3600,
         'scanProgressIntervalS': 0,
-        'type': 'sendreceive',
+        'type': params['type'],
         'useLargeBlocks': False,
         'versioning': {
             'params': {},
@@ -213,6 +219,8 @@ def run_module():
         path=dict(type='path', required=False),
         devices=dict(type='list', required=False, default=False),
         ignore_perms=dict(type='bool', required=False, default=False),
+        type=dict(type='str', default='sendreceive',
+            choices=['sendreceive', 'sendonly', 'receiveonly']),
         host=dict(type='str', default='http://127.0.0.1:8384'),
         api_key=dict(type='str', required=False, no_log=True),
         timeout=dict(type='int', default=30),
