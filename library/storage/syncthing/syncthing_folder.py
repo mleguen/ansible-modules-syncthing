@@ -39,6 +39,10 @@ options:
         description:
             - List of devices to share folder with
         required: false
+    fs_watcher:
+        description:
+            - Whether to activate the file-system watcher.
+        default: true
     ignore_perms:
         description:
             - Whether to ignore permissions when looking for changes.
@@ -173,7 +177,7 @@ def create_folder(params):
         'disableTempIndexes': False,
         'filesystemType': 'basic',
         'fsWatcherDelayS': 10,
-        'fsWatcherEnabled': True,
+        'fsWatcherEnabled': params['fs_watcher'],
         'hashers': 0,
         'id': params['id'],
         'ignoreDelete': False,
@@ -218,6 +222,7 @@ def run_module():
         label=dict(type='str', required=False),
         path=dict(type='path', required=False),
         devices=dict(type='list', required=False, default=False),
+        fs_watcher=dict(type='bool', default=True),
         ignore_perms=dict(type='bool', required=False, default=False),
         type=dict(type='str', default='sendreceive',
             choices=['sendreceive', 'sendonly', 'receiveonly']),
