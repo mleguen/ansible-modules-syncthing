@@ -177,11 +177,25 @@ def post_config(module, config, result):
         module.fail_json(msg='Error occured while posting new config', **result)
 
 # Returns an object of a new folder
-def create_folder(params):
-    folder = {
+def create_folder(params, current_device_ids):
+    # Collect wanted devices to share folder with.
+    # Note that the sequence ordering matters, so we stick with lists
+    # instead of sets.
+    device_ids = (
+        current_device_ids if set(current_device_ids) == set(params['devices'])
+        else params['devices']
+    )
+    devices = [
+        {
+            'deviceID': device_id,
+            'introducedBy': '',
+        } for device_id in device_ids
+    ]
+
+    return {
         'autoNormalize': True,
         'copiers': 0,
-        'devices': [],
+        'devices': devices,
         'disableSparseFiles': False,
         'disableTempIndexes': False,
         'filesystemType': 'basic',
@@ -213,15 +227,6 @@ def create_folder(params):
         },
         'weakHashThresholdPct': 25
     }
-
-    # Collect wanted devices to share folder with
-    for device_id in params['devices']:
-        folder['devices'].append({
-            'deviceID': device_id,
-            'introducedBy': '',
-        })
-
-    return folder
 
 def run_module():
     # module arguments
@@ -275,7 +280,8 @@ def run_module():
                 break
     else:
         folder_config = get_folder_config(module.params['id'], config)
-        folder_config_wanted = create_folder(module.params)
+        folder_config_devices = [d['deviceID'] for d in folder_config['devices']]
+        folder_config_wanted = create_folder(module.params, folder_config_devices)
 
         if folder_config is None:
             config['folders'].append(folder_config_wanted)
