@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright: (c) 2018, Rafael Bodill <justrafi at gmail>
+# Copyright: (c) 2020, Borjan Tchakaloff <first name at last name dot fr>
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 ANSIBLE_METADATA = {
@@ -242,8 +243,25 @@ def run_module():
         for folder in config['folders']:
             if folder['id'] == module.params['id']:
                 want_pause = module.params['state'] == 'pause'
-                if (want_pause and folder['paused']) or \
-                        (not want_pause and not folder['paused']):
+                already_configured = (
+                    (want_pause and folder['paused'])
+                    or
+                    (not want_pause and not folder['paused'])
+                )
+
+                want_devices = sorted([
+                    {
+                        'deviceID': device_id,
+                        'introducedBy': '',
+                    } for device_id in module.params['devices']
+                ], key=lambda d: d['deviceID'])
+                already_configured = (
+                    already_configured
+                    and
+                    want_devices == sorted(folder['devices'], key=lambda d: d['deviceID'])
+                )
+
+                if already_configured:
                     module.exit_json(**result)
                 else:
                     folder['paused'] = want_pause
