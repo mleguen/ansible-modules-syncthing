@@ -39,6 +39,10 @@ options:
         description:
             - List of devices to share folder with
         required: false
+    ignore_perms:
+        description:
+            - Whether to ignore permissions when looking for changes.
+        default: false
     host:
         description:
             - Host to connect to, including port
@@ -167,7 +171,7 @@ def create_folder(params):
         'hashers': 0,
         'id': params['id'],
         'ignoreDelete': False,
-        'ignorePerms': False,
+        'ignorePerms': params['ignore_perms'],
         'label': params['label'] if params['label'] else params['id'],
         'markerName': '.stfolder',
         'maxConflicts': -1,
@@ -208,6 +212,7 @@ def run_module():
         label=dict(type='str', required=False),
         path=dict(type='path', required=False),
         devices=dict(type='list', required=False, default=False),
+        ignore_perms=dict(type='bool', required=False, default=False),
         host=dict(type='str', default='http://127.0.0.1:8384'),
         api_key=dict(type='str', required=False, no_log=True),
         timeout=dict(type='int', default=30),
