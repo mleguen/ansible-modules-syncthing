@@ -280,7 +280,9 @@ def run_module():
                 break
     else:
         folder_config = get_folder_config(module.params['id'], config)
-        folder_config_devices = [d['deviceID'] for d in folder_config['devices']]
+        folder_config_devices = (
+            [d['deviceID'] for d in folder_config['devices']] if folder_config else []
+        )
         folder_config_wanted = create_folder(module.params, folder_config_devices)
 
         if folder_config is None:
