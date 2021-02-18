@@ -106,7 +106,7 @@ from xml.etree.ElementTree import parse
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.urls import fetch_url, url_argument_spec
 
-SYNCTHING_API_URI = "/rest/system/config"
+SYNCTHING_API_BASE_URI = "/rest"
 if platform.system() == 'Windows':
     DEFAULT_ST_CONFIG_LOCATION = '%localappdata%/Syncthing/config.xml'
 elif platform.system() == 'Darwin':
@@ -115,8 +115,8 @@ else:
     DEFAULT_ST_CONFIG_LOCATION = '$HOME/.config/syncthing/config.xml'
 
 
-def make_headers(host, api_key):
-    url = '{}{}'.format(host, SYNCTHING_API_URI)
+def make_headers(host, api_key, resource):
+    url = '{}{}/{}'.format(host, SYNCTHING_API_BASE_URI, resource)
     headers = {'X-Api-Key': api_key }
     return url, headers
 
@@ -135,12 +135,18 @@ def get_key_from_filesystem(module):
         module.fail_json(msg="Auto-configuration failed. Please specify"
                              "the API key manually.")
 
-# Fetch Syncthing configuration
-def get_config(module):
-    url, headers = make_headers(module.params['host'], module.params['api_key'])
+def get_data_from_rest_api(module, resource):
+    url, headers = make_headers(
+        module.params['host'], module.params['api_key'], resource
+    )
     resp, info = fetch_url(
-        module, url, data=None, headers=headers,
-        method='GET', timeout=module.params['timeout'])
+        module,
+        url,
+        data=None,
+        headers=headers,
+        method='GET',
+        timeout=module.params['timeout']
+    )
 
     if not info or info['status'] != 200:
         result['response'] = info
@@ -154,6 +160,10 @@ def get_config(module):
         module.fail_json(msg='Error occured while reading response', **result)
 
     return json.loads(content)
+
+# Fetch Syncthing configuration
+def get_config(module):
+    return get_data_from_rest_api(module, 'system/config')
 
 # Get the device name -> device ID mapping.
 def get_devices_mapping(config):
@@ -170,7 +180,11 @@ def get_folder_config(folder_id, config):
 
 # Post the new configuration to Syncthing API
 def post_config(module, config, result):
-    url, headers = make_headers(module.params['host'], module.params['api_key'])
+    url, headers = make_headers(
+        module.params['host'],
+        module.params['api_key'],
+        'system/config',
+    )
     headers['Content-Type'] = 'application/json'
 
     result['msg'] = config
