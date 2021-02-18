@@ -180,7 +180,7 @@ def post_config(module, config, result):
 
     if not info or info['status'] != 200:
         result['response'] = str(info)
-        module.fail_json(msg='Error occured while posting new config', **result)
+        module.fail_json(**result)
 
 # Returns an object of a new folder
 def create_folder(params, current_device_ids, devices_mapping):
