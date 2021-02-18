@@ -155,6 +155,12 @@ def get_config(module):
 
     return json.loads(content)
 
+# Get the device name -> device ID mapping.
+def get_devices_mapping(config):
+    return {
+        device['name']: device['deviceID'] for device in config['devices']
+    }
+
 # Get the folder configuration from the global configuration, if it exists
 def get_folder_config(folder_id, config):
     for folder in config['folders']:
@@ -177,13 +183,22 @@ def post_config(module, config, result):
         module.fail_json(msg='Error occured while posting new config', **result)
 
 # Returns an object of a new folder
-def create_folder(params, current_device_ids):
+def create_folder(params, current_device_ids, devices_mapping):
+    wanted_device_ids = []
+    for device_name_or_id in params['devices']:
+        if device_name_or_id in devices_mapping:
+            wanted_device_ids.append(devices_mapping[device_name_or_id])
+        else:
+            # Purposefully do not validate we already know this device ID or
+            # name as per previous behavior.  This will need to be fixed.
+            wanted_device_ids.append(device_name_or_id)
+
     # Collect wanted devices to share folder with.
     # Note that the sequence ordering matters, so we stick with lists
     # instead of sets.
     device_ids = (
-        current_device_ids if set(current_device_ids) == set(params['devices'])
-        else params['devices']
+        current_device_ids if set(current_device_ids) == set(wanted_device_ids)
+        else wanted_device_ids
     )
     devices = [
         {
@@ -271,6 +286,7 @@ def run_module():
         module.params['api_key'] = get_key_from_filesystem(module)
 
     config = get_config(module)
+    devices_mapping = get_devices_mapping(config)
     if module.params['state'] == 'absent':
         # Remove folder from list, if found
         for idx, folder in enumerate(config['folders']):
@@ -283,7 +299,9 @@ def run_module():
         folder_config_devices = (
             [d['deviceID'] for d in folder_config['devices']] if folder_config else []
         )
-        folder_config_wanted = create_folder(module.params, folder_config_devices)
+        folder_config_wanted = create_folder(
+            module.params, folder_config_devices, devices_mapping
+        )
 
         if folder_config is None:
             config['folders'].append(folder_config_wanted)
