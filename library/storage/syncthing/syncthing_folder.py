@@ -165,6 +165,10 @@ def get_data_from_rest_api(module, resource):
 def get_config(module):
     return get_data_from_rest_api(module, 'system/config')
 
+# Fetch Syncthing status
+def get_status(module):
+    return get_data_from_rest_api(module, 'system/status')
+
 # Get the device name -> device ID mapping.
 def get_devices_mapping(config):
     return {
@@ -197,23 +201,28 @@ def post_config(module, config, result):
         module.fail_json(**result)
 
 # Returns an object of a new folder
-def create_folder(params, current_device_ids, devices_mapping):
-    wanted_device_ids = []
+def create_folder(params, self_id, current_device_ids, devices_mapping):
+    # We need the current device ID as per the Syncthing API.
+    # If missing, Syncthing will add it alright, but we don't want to give
+    # the false idea that this configuration is different just because of that.
+    wanted_device_ids = {self_id}
     for device_name_or_id in params['devices']:
         if device_name_or_id in devices_mapping:
-            wanted_device_ids.append(devices_mapping[device_name_or_id])
+            wanted_device_ids.add(devices_mapping[device_name_or_id])
         else:
             # Purposefully do not validate we already know this device ID or
             # name as per previous behavior.  This will need to be fixed.
-            wanted_device_ids.append(device_name_or_id)
+            wanted_device_ids.add(device_name_or_id)
 
-    # Collect wanted devices to share folder with.
-    # Note that the sequence ordering matters, so we stick with lists
-    # instead of sets.
+    # Keep the original ordering if collections are equivalent.
+    # Again, for idempotency reasons.
     device_ids = (
-        current_device_ids if set(current_device_ids) == set(wanted_device_ids)
-        else wanted_device_ids
+        current_device_ids
+        if set(current_device_ids) == wanted_device_ids
+        else sorted(wanted_device_ids)
     )
+
+    # Sort the device IDs to keep idem-potency
     devices = [
         {
             'deviceID': device_id,
@@ -300,6 +309,7 @@ def run_module():
         module.params['api_key'] = get_key_from_filesystem(module)
 
     config = get_config(module)
+    self_id = get_status(module)['myID']
     devices_mapping = get_devices_mapping(config)
     if module.params['state'] == 'absent':
         # Remove folder from list, if found
@@ -314,7 +324,7 @@ def run_module():
             [d['deviceID'] for d in folder_config['devices']] if folder_config else []
         )
         folder_config_wanted = create_folder(
-            module.params, folder_config_devices, devices_mapping
+            module.params, self_id, folder_config_devices, devices_mapping
         )
 
         if folder_config is None:
