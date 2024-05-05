@@ -33,8 +33,15 @@ options:
         required: false
     host:
         description:
-            - Host to connect to, including port
-        default: http://127.0.0.1:8384
+            - API host to connect to, including protocole & port.
+              If not provided, will try to auto-configure from filesystem.
+        required: false
+    validate_certs:
+        description:
+            - Whether the API TLS certificate should be validated
+              (set to false when using Syncthing's default self-signed
+              certificate)
+        default: true
     api_key:
         description:
             - API key to use for authentication with host.
@@ -43,8 +50,9 @@ options:
     config_file:
         description:
             - Path to the Syncthing configuration file for automatic
-              discovery (`api_key`). Note that the running user needs read
-              access to the file.
+              discovery (`host` & `api_key`). If not provided, will try to
+              auto-detect from standard location. Note that the running user
+              needs read access to the file.
         required: false
     timeout:
         description:
@@ -74,76 +82,9 @@ response:
     type: dict
 '''
 
-import os
-import json
-import platform
-from xml.etree.ElementTree import parse
-
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.urls import fetch_url, url_argument_spec
+from ansible.module_utils.syncthing import get_common_argument_spec, get_config, post_config
 
-SYNCTHING_API_URI = "/rest/system/config"
-if platform.system() == 'Windows':
-    DEFAULT_ST_CONFIG_LOCATION = '%localappdata%/Syncthing/config.xml'
-elif platform.system() == 'Darwin':
-    DEFAULT_ST_CONFIG_LOCATION = '$HOME/Library/Application Support/Syncthing/config.xml'
-else:
-    DEFAULT_ST_CONFIG_LOCATION = '$HOME/.config/syncthing/config.xml'
-
-
-def make_headers(host, api_key):
-    url = '{}{}'.format(host, SYNCTHING_API_URI)
-    headers = {'X-Api-Key': api_key }
-    return url, headers
-
-def get_key_from_filesystem(module):
-    try:
-        if module.params['config_file']:
-            stconfigfile = module.params['config_file']
-        else:
-            stconfigfile = os.path.expandvars(DEFAULT_ST_CONFIG_LOCATION)
-        stconfig = parse(stconfigfile)
-        root = stconfig.getroot()
-        gui = root.find('gui')
-        api_key = gui.find('apikey').text
-        return api_key
-    except Exception:
-        module.fail_json(msg="Auto-configuration failed. Please specify"
-                             "the API key manually.")
-
-# Fetch Syncthing configuration
-def get_config(module):
-    url, headers = make_headers(module.params['host'], module.params['api_key'])
-    resp, info = fetch_url(
-        module, url, data=None, headers=headers,
-        method='GET', timeout=module.params['timeout'])
-
-    if not info or info['status'] != 200:
-        result['response'] = info
-        module.fail_json(msg='Error occured while calling host', **result)
-
-    try:
-        content = resp.read()
-    except AttributeError:
-        result['content'] = info.pop('body', '')
-        result['response'] = str(info)
-        module.fail_json(msg='Error occured while reading response', **result)
-
-    return json.loads(content)
-
-# Post the new configuration to Syncthing API
-def post_config(module, config, result):
-    url, headers = make_headers(module.params['host'], module.params['api_key'])
-    headers['Content-Type'] = 'application/json'
-
-    result['msg'] = config
-    resp, info = fetch_url(
-        module, url, data=json.dumps(config), headers=headers,
-        method='POST', timeout=module.params['timeout'])
-
-    if not info or info['status'] != 200:
-        result['response'] = str(info)
-        module.fail_json(msg='Error occured while posting new config', **result)
 
 # Returns an object of a new device
 def create_device(params):
@@ -170,14 +111,10 @@ def create_device(params):
 
 def run_module():
     # module arguments
-    module_args = url_argument_spec()
+    module_args = get_common_argument_spec()
     module_args.update(dict(
         id=dict(type='str', required=True),
         name=dict(type='str', required=False),
-        host=dict(type='str', default='http://127.0.0.1:8384'),
-        api_key=dict(type='str', required=False, no_log=True),
-        config_file=dict(type='str', required=False),
-        timeout=dict(type='int', default=30),
         state=dict(type='str', default='present',
                    choices=['absent', 'present', 'pause']),
     ))
@@ -200,11 +137,7 @@ def run_module():
     if module.check_mode:
         return result
 
-    # Auto-configuration: Try to fetch API key from filesystem
-    if not module.params['api_key']:
-        module.params['api_key'] = get_key_from_filesystem(module)
-
-    config = get_config(module)
+    config = get_config(module)[0]
     if module.params['state'] == 'absent':
         # Remove device from list, if found
         for idx, device in enumerate(config['devices']):

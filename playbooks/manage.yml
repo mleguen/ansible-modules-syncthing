@@ -2,7 +2,6 @@
 
 - hosts: syncthing
   vars:
-    syncthing_api: 127.0.0.1:8384
     syncthing_service_user: deploy
     syncthing_folders:
       - path: /srv/data/media
@@ -22,28 +21,27 @@
         mode:  '{{ item.mode  | default("0755") }}'
       with_items: "{{ syncthing_folders }}"
 
-    - name: Get system config to grab unique id of each machine
-      uri:
-        url: "http://{{ syncthing_api }}/rest/system/config"
-        return_content: no
-        status_code: [ 200, 403 ]
-      register: syncthing_config_raw
-      check_mode: no
+    - name: Gather syncthing facts
+      syncthing_facts:
+        # Mandatory when using Syncthing's default self signed TLS certificate
+        validate_certs: false
+      become: true
+      # To ensure read acess to Syncthing's config.xml for host & API key auto-detection
+      become_user: "{{ syncthing_service_user }}"
 
     - name: Set each machine with a unique id
       set_fact:
-        syncthing_id: "{{ syncthing_config_raw.x_syncthing_id }}"
         syncthing_ids: []
 
     - name: Prepare a list of all machine ids
       set_fact:
-        syncthing_ids: "{{ syncthing_ids + [ hostvars[item].syncthing_id ] }}"
+        syncthing_ids: "{{ syncthing_ids + [ hostvars[item].ansible_facts.syncthing.id ] }}"
       when: inventory_hostname != item
       with_items: "{{ groups['syncthing'] }}"
 
     - name: Ensure syncthing devices
       syncthing_device:
-        id: "{{ hostvars[item].syncthing_id }}"
+        id: "{{ hostvars[item].ansible_facts.syncthing.id }}"
         name: "{{ item }}"
       become: yes
       become_user: "{{ syncthing_service_user }}"

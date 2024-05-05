@@ -55,8 +55,15 @@ options:
         choices: ['sendreceive', 'sendonly', 'receiveonly']
     host:
         description:
-            - Host to connect to, including port
-        default: http://127.0.0.1:8384
+            - API host to connect to, including protocole & port.
+              If not provided, will try to auto-configure from filesystem.
+        required: false
+    validate_certs:
+        description:
+            - Whether the API TLS certificate should be validated
+              (set to false when using Syncthing's default self-signed
+              certificate)
+        default: true
     api_key:
         description:
             - API key to use for authentication with host.
@@ -65,8 +72,9 @@ options:
     config_file:
         description:
             - Path to the Syncthing configuration file for automatic
-              discovery (`api_key`). Note that the running user needs read
-              access to the file.
+              discovery (`host` & `api_key`). If not provided, will try to
+              auto-detect from standard location. Note that the running user
+              needs read access to the file.
         required: false
     timeout:
         description:
@@ -98,76 +106,13 @@ response:
     type: dict
 '''
 
-import os
-import json
-import platform
-from xml.etree.ElementTree import parse
-
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.urls import fetch_url, url_argument_spec
+from ansible.module_utils.syncthing import get_common_argument_spec, get_config, get_data_from_rest_api, post_config
 
-SYNCTHING_API_BASE_URI = "/rest"
-if platform.system() == 'Windows':
-    DEFAULT_ST_CONFIG_LOCATION = '%localappdata%/Syncthing/config.xml'
-elif platform.system() == 'Darwin':
-    DEFAULT_ST_CONFIG_LOCATION = '$HOME/Library/Application Support/Syncthing/config.xml'
-else:
-    DEFAULT_ST_CONFIG_LOCATION = '$HOME/.config/syncthing/config.xml'
-
-
-def make_headers(host, api_key, resource):
-    url = '{}{}/{}'.format(host, SYNCTHING_API_BASE_URI, resource)
-    headers = {'X-Api-Key': api_key }
-    return url, headers
-
-def get_key_from_filesystem(module):
-    try:
-        if module.params['config_file']:
-            stconfigfile = module.params['config_file']
-        else:
-            stconfigfile = os.path.expandvars(DEFAULT_ST_CONFIG_LOCATION)
-        stconfig = parse(stconfigfile)
-        root = stconfig.getroot()
-        gui = root.find('gui')
-        api_key = gui.find('apikey').text
-        return api_key
-    except Exception:
-        module.fail_json(msg="Auto-configuration failed. Please specify"
-                             "the API key manually.")
-
-def get_data_from_rest_api(module, resource):
-    url, headers = make_headers(
-        module.params['host'], module.params['api_key'], resource
-    )
-    resp, info = fetch_url(
-        module,
-        url,
-        data=None,
-        headers=headers,
-        method='GET',
-        timeout=module.params['timeout']
-    )
-
-    if not info or info['status'] != 200:
-        result['response'] = info
-        module.fail_json(msg='Error occured while calling host', **result)
-
-    try:
-        content = resp.read()
-    except AttributeError:
-        result['content'] = info.pop('body', '')
-        result['response'] = str(info)
-        module.fail_json(msg='Error occured while reading response', **result)
-
-    return json.loads(content)
-
-# Fetch Syncthing configuration
-def get_config(module):
-    return get_data_from_rest_api(module, 'system/config')
 
 # Fetch Syncthing status
 def get_status(module):
-    return get_data_from_rest_api(module, 'system/status')
+    return get_data_from_rest_api(module, 'system/status')[0]
 
 # Get the device name -> device ID mapping.
 def get_devices_mapping(config):
@@ -181,24 +126,6 @@ def get_folder_config(folder_id, config):
         if folder['id'] == folder_id:
             return folder
     return None
-
-# Post the new configuration to Syncthing API
-def post_config(module, config, result):
-    url, headers = make_headers(
-        module.params['host'],
-        module.params['api_key'],
-        'system/config',
-    )
-    headers['Content-Type'] = 'application/json'
-
-    result['msg'] = config
-    resp, info = fetch_url(
-        module, url, data=json.dumps(config), headers=headers,
-        method='POST', timeout=module.params['timeout'])
-
-    if not info or info['status'] != 200:
-        result['response'] = str(info)
-        module.fail_json(**result)
 
 # Returns an object of a new folder
 def create_folder(params, self_id, current_device_ids, devices_mapping):
@@ -268,7 +195,7 @@ def create_folder(params, self_id, current_device_ids, devices_mapping):
 
 def run_module():
     # module arguments
-    module_args = url_argument_spec()
+    module_args = get_common_argument_spec()
     module_args.update(dict(
         id=dict(type='str', required=True),
         label=dict(type='str', required=False),
@@ -278,10 +205,6 @@ def run_module():
         ignore_perms=dict(type='bool', required=False, default=False),
         type=dict(type='str', default='sendreceive',
             choices=['sendreceive', 'sendonly', 'receiveonly']),
-        host=dict(type='str', default='http://127.0.0.1:8384'),
-        api_key=dict(type='str', required=False, no_log=True),
-        config_file=dict(type='path', required=False),
-        timeout=dict(type='int', default=30),
         state=dict(type='str', default='present',
                    choices=['absent', 'present', 'pause']),
     ))
@@ -304,11 +227,7 @@ def run_module():
     if module.check_mode:
         return result
 
-    # Auto-configuration: Try to fetch API key from filesystem
-    if not module.params['api_key']:
-        module.params['api_key'] = get_key_from_filesystem(module)
-
-    config = get_config(module)
+    config = get_config(module)[0]
     self_id = get_status(module)['myID']
     devices_mapping = get_devices_mapping(config)
     if module.params['state'] == 'absent':
