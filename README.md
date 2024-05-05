@@ -15,6 +15,15 @@ Copy the `./library` directory to your Ansible project and ensure your
 library = ./library
 ```
 
+Alternatively, you can clone this repo locally, and symlink the contents of the `library` folder somewhere in your [default module path](https://docs.ansible.com/ansible/latest/reference_appendices/config.html#default-module-path), eg:
+
+```bash
+cd ${ANSIBLE_HOME:-~/.ansible}
+mkdir -p plugins/modules
+cd plugins/modules
+ln -s /path/to/your/local/clone/of/ansible-modules-syncthing/library/* .
+```
+
 Please note this module was tested on:
 
 * Debian Buster with Syncthing v1.0.0
