@@ -82,6 +82,8 @@ response:
     type: dict
 '''
 
+from yaml import safe_dump
+
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.syncthing import get_common_argument_spec, get_config, post_config
 
@@ -134,10 +136,8 @@ def run_module():
     if module.params['state'] != 'absent' and not module.params['name']:
         module.fail_json(msg='You must provide a name when creating', **result)
 
-    if module.check_mode:
-        return result
-
-    config = get_config(module)[0]
+    config = get_config(module)[0]  
+    before = safe_dump(config['devices'])
     if module.params['state'] == 'absent':
         # Remove device from list, if found
         for idx, device in enumerate(config['devices']):
@@ -150,22 +150,26 @@ def run_module():
         for device in config['devices']:
             if device['deviceID'] == module.params['id']:
                 want_pause = module.params['state'] == 'pause'
-                if (want_pause and device['paused']) or \
-                        (not want_pause and not device['paused']):
-                    module.exit_json(**result)
-                else:
+                if (want_pause and not device['paused']) or \
+                        (not want_pause and device['paused']):
                     device['paused'] = want_pause
                     result['changed'] = True
-                    break
 
+                break
         # Append the new device into configuration
-        if not result['changed']:
+        else:
             device = create_device(module.params)
             config['devices'].append(device)
             result['changed'] = True
 
     if result['changed']:
-        post_config(module, config, result)
+        if not module.check_mode:
+            post_config(module, config, result)
+
+        result['diff'] = {
+            "before": before,
+            "after": safe_dump(config['devices']), 
+        }
 
     module.exit_json(**result)
 
