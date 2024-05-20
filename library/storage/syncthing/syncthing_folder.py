@@ -226,14 +226,20 @@ def create_folder(params, self_id, current_device_ids, devices_mapping):
     devices = [
         {
             'deviceID': device_id,
+            'encryptionPassword': '',
             'introducedBy': '',
         } for device_id in device_ids
     ]
 
     return {
         'autoNormalize': True,
+        'blockPullOrder': 'standard',
+        'caseSensitiveFS': False,
         'copiers': 0,
+        'copyOwnershipFromParent': False,
+        'copyRangeMethod': 'standard',
         'devices': devices,
+        'disableFsync': False,
         'disableSparseFiles': False,
         'disableTempIndexes': False,
         'filesystemType': 'basic',
@@ -243,13 +249,16 @@ def create_folder(params, self_id, current_device_ids, devices_mapping):
         'id': params['id'],
         'ignoreDelete': False,
         'ignorePerms': params['ignore_perms'],
+        'junctionsAsDirs': False,
         'label': params['label'] if params['label'] else params['id'],
         'markerName': '.stfolder',
+        'maxConcurrentWrites': 2,
         'maxConflicts': -1,
         'minDiskFree': {
             'unit': '%',
             'value': 1
         },
+        'modTimeWindowS': 0,
         'order': 'random',
         'path': params['path'],
         'paused': True if params['state'] == 'paused' else False,
@@ -257,13 +266,24 @@ def create_folder(params, self_id, current_device_ids, devices_mapping):
         'pullerPauseS': 0,
         'rescanIntervalS': 3600,
         'scanProgressIntervalS': 0,
+        'sendOwnership': False,
+        'sendXattrs': False,
+        'syncOwnership': False,
+        'syncXattrs': False,
         'type': params['type'],
-        'useLargeBlocks': False,
         'versioning': {
+            'cleanupIntervalS': 3600,
+            'fsPath': '',
+            'fsType': 'basic',
             'params': {},
             'type': ''
         },
-        'weakHashThresholdPct': 25
+        'weakHashThresholdPct': 25,
+        'xattrFilter': {
+            'entries': [],
+            'maxSingleEntrySize': 1024,
+            'maxTotalSize': 4096,
+        }
     }
 
 def run_module():
