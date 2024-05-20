@@ -106,6 +106,8 @@ response:
     type: dict
 '''
 
+from yaml import safe_dump
+
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.syncthing import get_common_argument_spec, get_config, get_data_from_rest_api, post_config
 
@@ -224,10 +226,8 @@ def run_module():
     if module.params['state'] != 'absent' and not module.params['path']:
         module.fail_json(msg='You must provide a path when creating', **result)
 
-    if module.check_mode:
-        return result
-
-    config = get_config(module)[0]
+    config = get_config(module)[0]  
+    before = safe_dump(config['folders'])
     self_id = get_status(module)['myID']
     devices_mapping = get_devices_mapping(config)
     if module.params['state'] == 'absent':
@@ -256,7 +256,13 @@ def run_module():
             result['changed'] = True
 
     if result['changed']:
-        post_config(module, config, result)
+        if not module.check_mode:
+            post_config(module, config, result)
+
+        result['diff'] = {
+            "before": before,
+            "after": safe_dump(config['folders']), 
+        }
 
     module.exit_json(**result)
 
