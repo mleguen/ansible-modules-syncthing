@@ -25,20 +25,28 @@ description:
 options:
     id:
         description:
-            - This is the unique id of this new folder
+            - This is the unique id of the folder
         required: true
     label:
         description:
-            - The label for this new folder
+            - The label for the folder
         required: false
     path:
         description:
             - This is the path of the folder
+              (mandatory when state is not 'absent')
         required: false
     devices:
         description:
             - List of devices to share folder with
         required: false
+    append:
+        description:
+            - If `true`, share the folder with the devices specified in `devices`,
+              in addition to all other devices it is already shared with
+            - If `false`, the folder will be shared only with the devices specified in `devices`,
+              no longer with all other devices it is already shared with
+        default: false
     fs_watcher:
         description:
             - Whether to activate the file-system watcher.
@@ -143,6 +151,9 @@ def create_folder(params, self_id, current_device_ids, devices_mapping):
             # name as per previous behavior.  This will need to be fixed.
             wanted_device_ids.add(device_name_or_id)
 
+    if params['append']:
+        wanted_device_ids.update(current_device_ids)
+
     # Keep the original ordering if collections are equivalent.
     # Again, for idempotency reasons.
     device_ids = (
@@ -223,6 +234,7 @@ def run_module():
         label=dict(type='str', required=False),
         path=dict(type='path', required=False),
         devices=dict(type='list', required=False, default=False),
+        append=dict(type='bool', default=False),
         fs_watcher=dict(type='bool', default=True),
         ignore_perms=dict(type='bool', required=False, default=False),
         type=dict(type='str', default='sendreceive',
