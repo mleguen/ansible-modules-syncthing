@@ -216,6 +216,10 @@ def run_module():
         # Bail-out if device is already added
         for device in config['devices']:
             if device['deviceID'] == module.params['id']:
+                if (module.params['name'] and device['name'] != module.params['name']):
+                    device['name'] = module.params['name']
+                    result['changed'] = True
+
                 want_pause = module.params['state'] == 'pause'
                 if (want_pause and device['paused']) or \
                         (not want_pause and not device['paused']):
