@@ -49,10 +49,16 @@ options:
         default: false
     type:
         description:
-            - The folder type: sending local chances, and/or receiving
+            - The folder type: sending local changes, and/or receiving
               remote changes.
         default: sendreceive
         choices: ['sendreceive', 'sendonly', 'receiveonly']
+    order:
+        description:
+            - The order in which needed files should be pulled from the
+              cluster. It has no effect when the folder type is “send only”: 
+        default: random
+        choices: ['random', 'alphabetic', 'smallestFirst', 'largestFirst', 'oldestFirst', 'newestFirst']
     host:
         description:
             - Host to connect to, including port
@@ -250,7 +256,7 @@ def create_folder(params, self_id, current_device_ids, devices_mapping):
             'unit': '%',
             'value': 1
         },
-        'order': 'random',
+        'order': params['order'],
         'path': params['path'],
         'paused': True if params['state'] == 'paused' else False,
         'pullerMaxPendingKiB': 0,
@@ -278,6 +284,8 @@ def run_module():
         ignore_perms=dict(type='bool', required=False, default=False),
         type=dict(type='str', default='sendreceive',
             choices=['sendreceive', 'sendonly', 'receiveonly']),
+        order=dict(type='str', default='random',
+                   choices=['random', 'alphabetic', 'smallestFirst', 'largestFirst', 'oldestFirst', 'newestFirst']),
         host=dict(type='str', default='http://127.0.0.1:8384'),
         api_key=dict(type='str', required=False, no_log=True),
         config_file=dict(type='path', required=False),
