@@ -61,6 +61,12 @@ options:
               remote changes.
         default: sendreceive
         choices: ['sendreceive', 'sendonly', 'receiveonly']
+    trashcan_versioning:
+        description:
+            - Enables the "trashcan" versionning style for this folder,
+              keeping files for this number of days (0 means forever).
+              The cleanup is done at boot
+        required: false
     host:
         description:
             - API host to connect to, including protocole & port.
@@ -171,6 +177,24 @@ def create_folder(params, self_id, current_device_ids, devices_mapping):
         } for device_id in device_ids
     ]
 
+    # Default = no versioning
+    versioning = {
+        'cleanupIntervalS': 3600,
+        'fsPath': '',
+        'fsType': 'basic',
+        'params': {},
+        'type': ''
+    }
+    if 'trashcan_versioning' in params:
+        versioning.update({
+            'cleanupIntervalS': 0,
+            'params': {
+                # syncthing expects all params to be strings!
+                'cleanoutDays': str(params['trashcan_versioning']),
+            },
+            'type': 'trashcan',
+        })
+
     return {
         'autoNormalize': True,
         'blockPullOrder': 'standard',
@@ -211,13 +235,7 @@ def create_folder(params, self_id, current_device_ids, devices_mapping):
         'syncOwnership': False,
         'syncXattrs': False,
         'type': params['type'],
-        'versioning': {
-            'cleanupIntervalS': 3600,
-            'fsPath': '',
-            'fsType': 'basic',
-            'params': {},
-            'type': ''
-        },
+        'versioning': versioning,
         'weakHashThresholdPct': 25,
         'xattrFilter': {
             'entries': [],
@@ -239,6 +257,7 @@ def run_module():
         ignore_perms=dict(type='bool', required=False, default=False),
         type=dict(type='str', default='sendreceive',
             choices=['sendreceive', 'sendonly', 'receiveonly']),
+        trashcan_versioning=dict(type='int', required=False),
         state=dict(type='str', default='present',
                    choices=['absent', 'present', 'pause']),
     ))
