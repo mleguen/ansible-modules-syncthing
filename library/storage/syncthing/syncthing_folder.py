@@ -57,7 +57,7 @@ options:
         default: false
     type:
         description:
-            - The folder type: sending local chances, and/or receiving
+            - The folder type: sending local changes, and/or receiving
               remote changes.
         default: sendreceive
         choices: ['sendreceive', 'sendonly', 'receiveonly']
@@ -67,6 +67,12 @@ options:
               keeping files for this number of days (0 means forever).
               The cleanup is done at boot
         required: false
+    order:
+        description:
+            - The order in which needed files should be pulled from the
+              cluster. It has no effect when the folder type is “send only”: 
+        default: random
+        choices: ['random', 'alphabetic', 'smallestFirst', 'largestFirst', 'oldestFirst', 'newestFirst']
     host:
         description:
             - API host to connect to, including protocole & port.
@@ -223,7 +229,7 @@ def create_folder(params, self_id, current_device_ids, devices_mapping):
             'value': 1
         },
         'modTimeWindowS': 0,
-        'order': 'random',
+        'order': params['order'],
         'path': params['path'],
         'paused': True if params['state'] == 'paused' else False,
         'pullerMaxPendingKiB': 0,
@@ -258,6 +264,8 @@ def run_module():
         type=dict(type='str', default='sendreceive',
             choices=['sendreceive', 'sendonly', 'receiveonly']),
         trashcan_versioning=dict(type='int', required=False),
+        order=dict(type='str', default='random',
+                   choices=['random', 'alphabetic', 'smallestFirst', 'largestFirst', 'oldestFirst', 'newestFirst']),
         state=dict(type='str', default='present',
                    choices=['absent', 'present', 'pause']),
     ))
