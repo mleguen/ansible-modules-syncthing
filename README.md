@@ -7,7 +7,7 @@ Collection of modules for [Syncthing](https://syncthing.net) management.
 
 ## Install
 
-Copy the `./library` & `module_utils` directories to your Ansible project and ensure your
+Copy the `./library` & `./module_utils` directories to your Ansible project and ensure your
 `ansible.cfg` has these lines:
 
 ```ini
@@ -145,6 +145,24 @@ Examples:
   syncthing_folder:
     id: downloads
     state: absent
+```
+
+### Module: `syncthing_gui`
+
+Configure Syncthing GUI.
+
+Examples:
+
+```yml
+# Configure the GUI to enforce TLS and user/password authentication on the default 127.0.0.1:8384 address
+- name: Configure GUI
+  syncthing_gui:
+    host: "{{ syncthing.host }}"
+    api_key: "{{ syncthing.api_key }}"
+    validate_certs: "{{ syncthing.validate_certs | bool }}"
+    useTLS: true
+    user: syncthing
+    password: "{{ gui_password | password_hash('bcrypt') }}"
 ```
 
 ## License
