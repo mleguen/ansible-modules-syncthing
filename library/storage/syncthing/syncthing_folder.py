@@ -215,6 +215,7 @@ def create_folder(params, self_id, current_device_ids, devices_mapping):
         'filesystemType': 'basic',
         'fsWatcherDelayS': 10,
         'fsWatcherEnabled': params['fs_watcher'],
+        'fsWatcherTimeoutS': 0,
         'hashers': 0,
         'id': params['id'],
         'ignoreDelete': False,
